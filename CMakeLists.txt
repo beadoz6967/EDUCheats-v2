@@ -59,6 +59,7 @@ target_link_libraries(EDUCheats PRIVATE
     dwmapi
     d3d11
     dxgi
+    dcomp
     d3dcompiler
 )
 

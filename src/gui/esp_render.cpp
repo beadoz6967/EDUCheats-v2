@@ -165,6 +165,17 @@ void DrawAll(const PlayerESPData players[64], int count, int localTeam,
             DrawTextCentered(dl, { feet.x, y + boxH + 3.f }, DistanceColor(p.distance), buf);
         }
 
+        // Visibility label — right of box, enemies only
+        if (cfg.visibilityCheck.load() && p.isEnemy) {
+            const char* label = p.isVisible ? "VIS" : "NOT VIS";
+            ImU32 vcol = p.isVisible
+                ? IM_COL32(0x50, 0xFF, 0x50, 0xFF)
+                : IM_COL32(0xFF, 0x40, 0x40, 0xFF);
+            float labelX = x + boxW + 3.f;
+            float labelY = y + boxH * 0.5f - lineH * 0.5f;
+            DrawTextOutlined(dl, { labelX, labelY }, vcol, label);
+        }
+
         if (cfg.skeleton.load()) {
             ImU32 scol      = cfg.skeletonColor.load() != 0u
                               ? static_cast<ImU32>(cfg.skeletonColor.load()) : col;

@@ -7,10 +7,12 @@
 #include <d3d11.h>
 #include <dxgi1_5.h>   // IDXGIFactory2/5, IDXGISwapChain1, DXGI_SWAP_CHAIN_DESC1, tearing
 #include <dwmapi.h>
+#include <dcomp.h>
 #include <imgui.h>
 #include <backends/imgui_impl_dx11.h>
 #include <backends/imgui_impl_win32.h>
 #include <cstdio>
+#include <cmath>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -32,8 +34,7 @@ LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (g_overlay && g_overlay->m_device && wp != SIZE_MINIMIZED) {
             g_overlay->DestroyRenderTarget();
             auto* sc = static_cast<IDXGISwapChain1*>(g_overlay->m_swapchain);
-            UINT flags = g_overlay->m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
-            sc->ResizeBuffers(0, LOWORD(lp), HIWORD(lp), DXGI_FORMAT_UNKNOWN, flags);
+            sc->ResizeBuffers(0, LOWORD(lp), HIWORD(lp), DXGI_FORMAT_UNKNOWN, 0);
             g_overlay->CreateRenderTarget();
             g_overlay->m_winW = LOWORD(lp);
             g_overlay->m_winH = HIWORD(lp);
@@ -99,7 +100,7 @@ bool Overlay::CreateOverlayWindow() {
     }
 
     m_hwnd = CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
+        WS_EX_NOREDIRECTIONBITMAP | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
         kOverlayClass, L"EDUCheats",
         WS_POPUP,
         gameRect.left, gameRect.top, m_winW, m_winH,
@@ -110,15 +111,8 @@ bool Overlay::CreateOverlayWindow() {
         return false;
     }
 
-    // Alpha-channel layering — DX11 clears to {0,0,0,0} and DWM composites
-    // properly. Avoids color-key issues that broke the previous GDI overlay.
-    SetLayeredWindowAttributes(m_hwnd, 0, 255, LWA_ALPHA);
-
-    // Extend DWM glass into the whole client area so the transparent
-    // backdrop survives compositing.
-    MARGINS margins{ -1, -1, -1, -1 };
-    DwmExtendFrameIntoClientArea(m_hwnd, &margins);
-
+    // WS_EX_NOREDIRECTIONBITMAP + DirectComposition handles transparency.
+    // WS_EX_TRANSPARENT starts set — HTTRANSPARENT passes all clicks to CS2.
     ShowWindow(m_hwnd, SW_SHOW);
     UpdateWindow(m_hwnd);
     return true;
@@ -171,20 +165,9 @@ bool Overlay::CreateDeviceAndSwapchain() {
         return false;
     }
 
-    // Check hardware tearing support (Windows 10 1607+)
-    IDXGIFactory5* factory5 = nullptr;
-    m_tearingSupported = false;
-    if (SUCCEEDED(factory2->QueryInterface(IID_PPV_ARGS(&factory5)))) {
-        BOOL allow = FALSE;
-        if (SUCCEEDED(factory5->CheckFeatureSupport(
-                DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow, sizeof(allow))))
-            m_tearingSupported = (allow == TRUE);
-        factory5->Release();
-    }
-
     DXGI_SWAP_CHAIN_DESC1 sd{};
-    sd.Width              = 0;
-    sd.Height             = 0;
+    sd.Width              = static_cast<UINT>(m_winW);
+    sd.Height             = static_cast<UINT>(m_winH);
     sd.Format             = DXGI_FORMAT_B8G8R8A8_UNORM;
     sd.Stereo             = FALSE;
     sd.SampleDesc.Count   = 1;
@@ -194,21 +177,59 @@ bool Overlay::CreateDeviceAndSwapchain() {
     sd.Scaling            = DXGI_SCALING_STRETCH;
     sd.SwapEffect         = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     sd.AlphaMode          = DXGI_ALPHA_MODE_PREMULTIPLIED;
-    sd.Flags              = m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0u;
+    sd.Flags              = 0;
 
+    // CreateSwapChainForComposition supports PREMULTIPLIED alpha (unlike ForHwnd).
+    // DirectComposition binds the swap chain to the HWND.
     IDXGISwapChain1* swap1 = nullptr;
-    hr = factory2->CreateSwapChainForHwnd(dev, m_hwnd, &sd, nullptr, nullptr, &swap1);
+    hr = factory2->CreateSwapChainForComposition(dev, &sd, nullptr, &swap1);
     factory2->Release();
 
     if (FAILED(hr)) {
-        printf("[Overlay] CreateSwapChainForHwnd failed (0x%lX)\n", hr);
+        printf("[Overlay] CreateSwapChainForComposition failed (0x%lX)\n", hr);
+        if (dxgiDev) dxgiDev->Release();
         dev->Release(); ctx->Release();
         return false;
     }
 
-    m_device    = dev;
-    m_deviceCtx = ctx;
-    m_swapchain = swap1;
+    IDCompositionDevice* dcompDev = nullptr;
+    hr = DCompositionCreateDevice(dxgiDev, IID_PPV_ARGS(&dcompDev));
+    dxgiDev->Release();
+
+    if (FAILED(hr)) {
+        printf("[Overlay] DCompositionCreateDevice failed (0x%lX)\n", hr);
+        swap1->Release(); dev->Release(); ctx->Release();
+        return false;
+    }
+
+    IDCompositionTarget* dcompTarget = nullptr;
+    hr = dcompDev->CreateTargetForHwnd(m_hwnd, TRUE, &dcompTarget);
+    if (FAILED(hr)) {
+        printf("[Overlay] DComp CreateTargetForHwnd failed (0x%lX)\n", hr);
+        dcompDev->Release(); swap1->Release(); dev->Release(); ctx->Release();
+        return false;
+    }
+
+    IDCompositionVisual* dcompVisual = nullptr;
+    hr = dcompDev->CreateVisual(&dcompVisual);
+    if (FAILED(hr)) {
+        printf("[Overlay] DComp CreateVisual failed (0x%lX)\n", hr);
+        dcompTarget->Release(); dcompDev->Release();
+        swap1->Release(); dev->Release(); ctx->Release();
+        return false;
+    }
+
+    dcompVisual->SetContent(swap1);
+    dcompTarget->SetRoot(dcompVisual);
+    dcompDev->Commit();
+
+    m_device      = dev;
+    m_deviceCtx   = ctx;
+    m_swapchain   = swap1;
+    m_dcompDevice = dcompDev;
+    m_dcompTarget = dcompTarget;
+    m_dcompVisual = dcompVisual;
+
     CreateRenderTarget();
     return true;
 }
@@ -239,9 +260,12 @@ void Overlay::DestroyRenderTarget() {
 
 void Overlay::DestroyDevice() {
     DestroyRenderTarget();
-    if (m_swapchain)  { static_cast<IDXGISwapChain1*>(m_swapchain)->Release();     m_swapchain  = nullptr; }
-    if (m_deviceCtx)  { static_cast<ID3D11DeviceContext*>(m_deviceCtx)->Release(); m_deviceCtx  = nullptr; }
-    if (m_device)     { static_cast<ID3D11Device*>(m_device)->Release();           m_device     = nullptr; }
+    if (m_dcompVisual) { static_cast<IDCompositionVisual*>(m_dcompVisual)->Release(); m_dcompVisual = nullptr; }
+    if (m_dcompTarget) { static_cast<IDCompositionTarget*>(m_dcompTarget)->Release(); m_dcompTarget = nullptr; }
+    if (m_dcompDevice) { static_cast<IDCompositionDevice*>(m_dcompDevice)->Release(); m_dcompDevice = nullptr; }
+    if (m_swapchain)   { static_cast<IDXGISwapChain1*>(m_swapchain)->Release();       m_swapchain   = nullptr; }
+    if (m_deviceCtx)   { static_cast<ID3D11DeviceContext*>(m_deviceCtx)->Release();   m_deviceCtx   = nullptr; }
+    if (m_device)      { static_cast<ID3D11Device*>(m_device)->Release();             m_device      = nullptr; }
 }
 
 void Overlay::RefreshGameWindowBounds() {
@@ -324,6 +348,22 @@ void Overlay::RenderFrame() {
                             liveView, m_winW, m_winH, m_cfg);
     }
 
+    // FOV circle — drawn when aimbot is enabled, independent of ESP master toggle.
+    // Radius derived from the aimbot angular FOV (degrees, Euclidean pitch+yaw)
+    // projected onto screen using CS2's fixed vertical FOV of ~73.74°.
+    if (m_ab.enabled.load()) {
+        constexpr float kGameVFOV = 73.74f;
+        constexpr float kPI       = 3.14159265f;
+        float fov    = m_ab.fov.load();
+        float radius = std::tan(fov * kPI / 180.f)
+                     / std::tan(kGameVFOV * 0.5f * kPI / 180.f)
+                     * (m_winH * 0.5f);
+        ImVec2 center{ m_winW * 0.5f, m_winH * 0.5f };
+        ImDrawList* dl = ImGui::GetBackgroundDrawList();
+        dl->AddCircle(center, radius, IM_COL32(0, 0, 0, 110), 0, 3.0f);
+        dl->AddCircle(center, radius, IM_COL32(255, 255, 255, 200), 0, 1.5f);
+    }
+
     if (m_menuVisible) {
         menu_ui::Draw(m_cfg, m_ab, m_state, m_persist, m_menuVisible);
     }
@@ -335,10 +375,8 @@ void Overlay::RenderFrame() {
     ctx->ClearRenderTargetView(rtv, clear);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    // syncInterval=0: no vsync wait. ALLOW_TEARING only when hardware supports it —
-    // passing the flag on unsupported hardware returns DXGI_ERROR_INVALID_CALL.
-    UINT presentFlags = m_tearingSupported ? DXGI_PRESENT_ALLOW_TEARING : 0u;
-    swap->Present(0, presentFlags);
+    // syncInterval=0: no vsync wait. Tearing flag omitted — incompatible with layered windows.
+    swap->Present(0, 0);
 }
 
 void Overlay::Run(std::atomic<bool>& running) {

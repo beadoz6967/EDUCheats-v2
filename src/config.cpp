@@ -107,7 +107,8 @@ void Config::Load(ESPConfig& cfg, AimbotConfig& ab) const {
     cfg.colorMode   = getInt ("colorMode",   cfg.colorMode.load());
     cfg.distanceESP = getBool("distanceESP", cfg.distanceESP.load());
     cfg.hpNumbers   = getBool("hpNumbers",   cfg.hpNumbers.load());
-    cfg.skeleton    = getBool("skeleton",    cfg.skeleton.load());
+    cfg.skeleton          = getBool("skeleton",          cfg.skeleton.load());
+    cfg.visibilityCheck   = getBool("visibilityCheck",   cfg.visibilityCheck.load());
 
     cfg.boxColor.store(ParseHex(kv.count("boxColor") ? kv.at("boxColor") : std::string("0"), cfg.boxColor.load()));
     cfg.skeletonColor.store(ParseHex(kv.count("skeletonColor") ? kv.at("skeletonColor") : std::string("0"), cfg.skeletonColor.load()));
@@ -131,7 +132,8 @@ void Config::Save(const ESPConfig& cfg, const AimbotConfig& ab) const {
         << "colorMode="   <<  cfg.colorMode.load()           << '\n'
         << "distanceESP=" << (cfg.distanceESP.load() ? 1 : 0) << '\n'
         << "hpNumbers="   << (cfg.hpNumbers.load()   ? 1 : 0) << '\n'
-        << "skeleton="    << (cfg.skeleton.load()    ? 1 : 0) << '\n'
+        << "skeleton="         << (cfg.skeleton.load()         ? 1 : 0) << '\n'
+        << "visibilityCheck=" << (cfg.visibilityCheck.load() ? 1 : 0) << '\n'
         << "boxColor=0x"  << std::hex << cfg.boxColor.load() << std::dec << '\n'
         << "skeletonColor=0x" << std::hex << cfg.skeletonColor.load() << std::dec << '\n'
         << "skeletonThick=" << cfg.skeletonThick.load() << '\n'

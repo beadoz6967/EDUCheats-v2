@@ -17,7 +17,8 @@ struct ESPConfig {
     std::atomic<bool> distanceESP { true };
     std::atomic<bool> hpNumbers   { true };
     // Toggle skeleton lines (independent of box settings)
-    std::atomic<bool> skeleton    { true };
+    std::atomic<bool> skeleton        { true };
+    std::atomic<bool> visibilityCheck { true };
 
     // Customization: packed ImU32 colors (0 = use default theme), thickness and joint size
     std::atomic<uint32_t> boxColor        { 0u };
@@ -54,5 +55,6 @@ struct PlayerESPData {
     // fixed-size buffer is stored to avoid dynamic allocation in the
     // real-time scan loop.
     Vector3     bones[64];
-    int         boneCount = 0;
+    int         boneCount  = 0;
+    bool        isVisible  = false;
 };

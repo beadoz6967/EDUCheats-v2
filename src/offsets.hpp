@@ -32,6 +32,7 @@ namespace client {
         constexpr uintptr_t m_vOldOrigin     = 0x1390;// 5008 — Vector3, used as fallback origin
         constexpr uintptr_t v_angle          = 0x12A8; // C_BasePlayerPawn::v_angle — current view {pitch,yaw,0}
         constexpr uintptr_t m_vecViewOffset  = 0xE70;  // C_BaseModelEntity — add to sceneNode origin for eye pos
+        constexpr uintptr_t m_entitySpottedState = 0x1C38; // EntitySpottedState_t; +0x0 = m_bSpotted (bool)
     }
 
     // CGameSceneNode

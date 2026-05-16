@@ -173,7 +173,8 @@ void Draw(ESPConfig& cfg, AimbotConfig& ab, GameState& state, Config& persist, b
     dirty |= ToggleRow("Health bar",     cfg.healthBar);
     dirty |= ToggleRow("HP numbers",     cfg.hpNumbers);
     dirty |= ToggleRow("Distance",       cfg.distanceESP);
-    dirty |= ToggleRow("Skeleton",       cfg.skeleton);
+    dirty |= ToggleRow("Skeleton",          cfg.skeleton);
+    dirty |= ToggleRow("Visibility check", cfg.visibilityCheck);
 
     ImGui::Dummy({ 0.f, 4.f });
 

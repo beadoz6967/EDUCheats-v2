@@ -56,8 +56,13 @@ private:
     // DX11
     void*         m_device          = nullptr; // ID3D11Device*
     void*         m_deviceCtx       = nullptr; // ID3D11DeviceContext*
-    void*         m_swapchain       = nullptr; // IDXGISwapChain*
+    void*         m_swapchain       = nullptr; // IDXGISwapChain1*
     void*         m_renderTargetView= nullptr; // ID3D11RenderTargetView*
+
+    // DirectComposition — binds the swap chain to the HWND with premultiplied alpha
+    void*         m_dcompDevice     = nullptr; // IDCompositionDevice*
+    void*         m_dcompTarget     = nullptr; // IDCompositionTarget*
+    void*         m_dcompVisual     = nullptr; // IDCompositionVisual*
 
     // Shared snapshot — view matrix intentionally excluded (read live on render thread)
     std::mutex      m_lock;
@@ -66,10 +71,9 @@ private:
     int             m_localTeam   = 0;
 
     // UI state
-    bool m_menuVisible      = false;
-    bool m_prevInsert       = false;
-    bool m_clickThrough     = true;
-    bool m_tearingSupported = false;
+    bool m_menuVisible  = false;
+    bool m_prevInsert   = false;
+    bool m_clickThrough = true;
 
     // Tracked game window bounds (position + size) for overlay repositioning
     int  m_winX = 0;

@@ -245,6 +245,18 @@ int main() {
                           view.m[3][2] != 0.f || view.m[3][3] != 0.f);
         gameState.matrixOk.store(matrixOk);
 
+        // Find local player's 0-based slot for m_bSpottedByMask.
+        // Slot = entity list index - 1. Scan 1..64 (player range only).
+        int localSlot = -1;
+        if (localControllerPtr) {
+            for (int i = 1; i <= 64; ++i) {
+                if (entityList.GetController(i) == localControllerPtr) {
+                    localSlot = i - 1;
+                    break;
+                }
+            }
+        }
+
         PlayerESPData players[64]{};
         int count = 0;
         float nearestEnemyMeters = -1.f;
@@ -293,6 +305,15 @@ int main() {
                         }
                     }
                 }
+            }
+
+            // m_bSpottedByMask (+0x4): per-player bitmask, bit N = slot N can see this pawn.
+            // More accurate than m_bSpotted (+0x0) which fires if ANY enemy has LOS.
+            if (localSlot >= 0) {
+                uint32_t mask = mem.Read<uint32_t>(pawnPtr + client::C_CSPlayerPawn::m_entitySpottedState + 0x4);
+                d.isVisible = ((mask >> localSlot) & 1u) != 0;
+            } else {
+                d.isVisible = (mem.Read<uint8_t>(pawnPtr + client::C_CSPlayerPawn::m_entitySpottedState) != 0);
             }
 
             d.distance = Distance3D(localOrigin, d.origin) * kUnitsToMeters;
