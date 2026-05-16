@@ -207,14 +207,14 @@ void DrawAll(const PlayerESPData players[64], int count, int localTeam,
                     {4, 8}, {8, 9}, {9, 10}, {10, 11},
                     // right arm
                     {4, 12}, {12, 13}, {13, 14}, {14, 15},
-                    // left leg: bone[1]=pelvis -> 17=upper thigh -> 18=knee -> 19=ankle
-                    {1, 17}, {17, 18}, {18, 19},
+                    // left leg: bone[1]=pelvis -> 16=thigh_L -> 17=shin_L -> 18=ankle_L
+                    {1, 16}, {16, 17}, {17, 18},
                     // right leg: bone[1]=pelvis -> 20=upper thigh -> 21=knee -> 22=ankle
                     {1, 20}, {20, 21}, {21, 22},
                 };
                 // head, chest, pelvis, elbows, knees
                 static constexpr int kJointNodes[] = {
-                    7, 4, 1, 10, 14, 18, 21
+                    7, 4, 1, 10, 14, 17, 21
                 };
 
                 ImVec2 bs[30]{};
