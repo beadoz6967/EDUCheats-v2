@@ -156,7 +156,6 @@ bool Overlay::CreateDeviceAndSwapchain() {
     if (SUCCEEDED(hr)) hr = dxgiDev->GetAdapter(&adapter);
     if (SUCCEEDED(hr)) hr = adapter->GetParent(IID_PPV_ARGS(&factory2));
 
-    if (dxgiDev) dxgiDev->Release();
     if (adapter)  adapter->Release();
 
     if (FAILED(hr) || !factory2) {
@@ -377,6 +376,7 @@ void Overlay::RenderFrame() {
 
     // syncInterval=0: no vsync wait. Tearing flag omitted — incompatible with layered windows.
     swap->Present(0, 0);
+    static_cast<IDCompositionDevice*>(m_dcompDevice)->Commit();
 }
 
 void Overlay::Run(std::atomic<bool>& running) {

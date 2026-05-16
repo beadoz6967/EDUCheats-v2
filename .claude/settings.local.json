@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\fofol\\\\OneDrive\\\\Dokumenty\\(1\\)\\\\cs2-external\" -Recurse -File | Where-Object {$_.Extension -match '\\\\.\\(cpp|hpp|h|c\\)$'} | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\fofol\\\\OneDrive\\\\Dokumenty\\(1\\)\\\\cs2-external\\\\src\\\\main.cpp\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\fofol\\\\OneDrive\\\\Dokumenty\\(1\\)\\\\cs2-external\\\\src\\\\memory.hpp\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\fofol\\\\OneDrive\\\\Dokumenty\\(1\\)\\\\cs2-external\\\\src\\\\memory.cpp\" -Force)",
+      "Bash(Write-Host \"Deleted 3 files\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\fofol\\\\OneDrive\\\\Dokumenty\\(1\\)\\\\cs2-external\\\\build\" -Depth 2 | Where-Object { $_.Name -match \"minhook|MinHook\" } | Select-Object FullName)",
+      "Bash(git rm *)"
+    ]
+  }
+}
